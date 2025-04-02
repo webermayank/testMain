@@ -11,30 +11,7 @@ import p5 from '../core/main';
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * 
- * test 1
- * 
- * test 2
- * 
- * test 3
- * 
- * test 4
- * 
- * test 5
- * 
- * test 6
- * 
- * test 7
- * 
- * test 8
- * 
- * TEST 9
- * 
- * test 10
- * 
- * test 11
- * 
- * test 12
+ * again test 1
  * 
  * Sets the position and orientation of the current camera in a 3D sketch.
  *
