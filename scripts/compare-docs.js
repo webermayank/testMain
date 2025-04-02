@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const { diffLines } = require("diff"); // You'll need to install this package: npm install diff
+const { diffLines } = require("diff");
 
 const SRC_DIR = "src/";
 const OUTPUT_FILE = "docs_changes.json";
@@ -18,14 +18,22 @@ function extractJSDocWithLines(content, filePath) {
     if (line.startsWith("/**") && !inJSDoc) {
       inJSDoc = true;
       startLine = i + 1; // 1-based line number
+      console.log(`Found JSDoc start at line ${startLine} in ${filePath}`);
     } else if (line.endsWith("*/") && inJSDoc) {
       inJSDoc = false;
+      const endLine = i + 1;
+      const jsdocText = lines.slice(startLine - 1, endLine).join("\n");
       jsdocComments.push({
-        text: lines.slice(startLine - 1, i + 1).join("\n"),
+        text: jsdocText,
         startLine: startLine,
-        endLine: i + 1,
+        endLine: endLine,
       });
+      console.log(`Found JSDoc end at line ${endLine} in ${filePath}`);
     }
+  }
+
+  if (jsdocComments.length === 0) {
+    console.log(`No JSDoc comments found in ${filePath}`);
   }
 
   return jsdocComments;
@@ -34,10 +42,12 @@ function extractJSDocWithLines(content, filePath) {
 // Get changed files between the last and previous commit
 function getChangedFiles() {
   try {
+    console.log("Running git diff to find changed files...");
     const output = execSync(`git diff --name-only HEAD~1 HEAD -- ${SRC_DIR}`)
       .toString()
       .trim()
       .split("\n");
+    console.log("Changed files:", output);
     return output.filter((file) => file.endsWith(".js"));
   } catch (error) {
     console.error("Error getting changed files:", error);
@@ -50,6 +60,11 @@ function compareJSDoc() {
   const changedFiles = getChangedFiles();
   const changes = [];
 
+  if (changedFiles.length === 0) {
+    console.log("No JavaScript files changed in src/");
+    return changes;
+  }
+
   changedFiles.forEach((file) => {
     console.log(`Processing file: ${file}`);
     const fullPath = path.join(__dirname, "..", file);
@@ -58,10 +73,15 @@ function compareJSDoc() {
       const oldContent = execSync(`git show HEAD~1:${file}`).toString();
       const newContent = fs.readFileSync(fullPath, "utf-8");
 
+      console.log(`Old content length for ${file}: ${oldContent.length}`);
+      console.log(`New content length for ${file}: ${newContent.length}`);
+
       const oldDocs = extractJSDocWithLines(oldContent, file);
       const newDocs = extractJSDocWithLines(newContent, file);
 
-      // Compare each JSDoc block
+      console.log(`Old JSDoc blocks in ${file}:`, oldDocs);
+      console.log(`New JSDoc blocks in ${file}:`, newDocs);
+
       oldDocs.forEach((oldDoc, index) => {
         if (newDocs[index]) {
           const diffResult = diffLines(oldDoc.text, newDocs[index].text);
@@ -71,6 +91,10 @@ function compareJSDoc() {
               changes.push({
                 file: file,
                 line: oldDoc.startLine, // Use the starting line of the JSDoc block
+                old: part.removed ? part.value.trim() : "N/A",
+                new: part.added ? part.value.trim() : "N/A",
+              });
+              console.log(`Change detected in ${file} at line ${oldDoc.startLine}:`, {
                 old: part.removed ? part.value.trim() : "N/A",
                 new: part.added ? part.value.trim() : "N/A",
               });
@@ -84,6 +108,7 @@ function compareJSDoc() {
             old: oldDoc.text.trim(),
             new: "N/A",
           });
+          console.log(`JSDoc removed in ${file} at line ${oldDoc.startLine}:`, oldDoc.text.trim());
         }
       });
 
@@ -96,6 +121,7 @@ function compareJSDoc() {
             old: "N/A",
             new: newDoc.text.trim(),
           });
+          console.log(`New JSDoc added in ${file} at line ${newDoc.startLine}:`, newDoc.text.trim());
         }
       });
 
