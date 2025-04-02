@@ -22,40 +22,39 @@ jobs:
         run: node ./scripts/compare-docs.js
 
       - name: Read changes JSON
-        id: read-changes
+        id: detect-changes
         run: |
+          cat docs_changes.json  # Debugging step to verify JSON content
           if [ -s docs_changes.json ]; then
             echo "Changes detected!"
-            echo "CHANGES=$(jq -c . docs_changes.json)" >> "$GITHUB_ENV"
+            CHANGES_JSON=$(jq -c . docs_changes.json)
+            echo "CHANGES=$CHANGES_JSON" >> "$GITHUB_ENV"
+            echo "::set-output name=CHANGES::$CHANGES_JSON"
           else
             echo "No changes detected."
             echo "CHANGES=[]" >> "$GITHUB_ENV"
+            echo "::set-output name=CHANGES::[]"
           fi
-
-      - name: Debug changed files
-        run: |
-          echo "Detected Changes: ${{ steps.detect-changes.outputs.CHANGES }}"
-
 
       - name: Debug Output
         run: |
-          echo "Detected Changes: $CHANGES"
-        env:
-          CHANGES: ${{ env.CHANGES }}
+          echo "Detected Changes: ${{ steps.detect-changes.outputs.CHANGES }}"
 
       - name: Create Issue in testWebsite
         uses: actions/github-script@v7
         env:
-          CHANGES: ${{ env.CHANGES }}
+          CHANGES: ${{ steps.detect-changes.outputs.CHANGES }}
         with:
           github-token: ${{ secrets.WEBSITE_REPO_TOKEN }}
           script: |
-            const changes = JSON.parse(process.env.CHANGES || '[]'); // ✅ Prevents parsing errors
+            console.log("CHANGES from env:", process.env.CHANGES);
+            const changes = JSON.parse(process.env.CHANGES || '[]');
+
             if (changes.length === 0) {
               console.log("No changes detected. Skipping issue creation.");
               return;
             }
-            
+
             let issueBody = changes.map(change => 
               `- **File**: \`${change.file}\`\n  - **Line**: ${change.line}\n  - **Old**: ${change.old || "N/A"}\n  - **New**: ${change.new || "N/A"}`
             ).join("\n\n");
