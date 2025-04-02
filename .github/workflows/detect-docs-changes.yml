@@ -23,7 +23,23 @@ jobs:
 
       - name: Read changes JSON
         id: read-changes
-        run: echo "::set-output name=changes::$(cat docs_changes.json | jq -c .)"
+        run: |
+          if [ -s docs_changes.json ]; then
+            echo "Changes detected!"
+            echo "CHANGES=$(jq -c . docs_changes.json)" >> "$GITHUB_ENV"
+          else
+            echo "No changes detected."
+            echo "CHANGES=[]" >> "$GITHUB_ENV"
+          fi
+
+      - name: Debug Output
+        run: |
+          echo "Detected Changes: $CHANGES"
+        env:
+          CHANGES: ${{ env.CHANGES }}
+
+
+
 
       - name: Create Issue in testWebsite
         if: steps.read-changes.outputs.changes != '[]'
