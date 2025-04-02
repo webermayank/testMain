@@ -32,6 +32,11 @@ jobs:
             echo "CHANGES=[]" >> "$GITHUB_ENV"
           fi
 
+      - name: Debug changed files
+        run: |
+          echo "Detected Changes: ${{ steps.detect-changes.outputs.CHANGES }}"
+
+
       - name: Debug Output
         run: |
           echo "Detected Changes: $CHANGES"
