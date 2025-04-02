@@ -38,9 +38,6 @@ jobs:
         env:
           CHANGES: ${{ env.CHANGES }}
 
-
-
-
       - name: Create Issue in testWebsite
         if: steps.read-changes.outputs.changes != '[]'
         uses: actions/github-script@v7
