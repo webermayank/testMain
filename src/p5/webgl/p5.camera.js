@@ -13,6 +13,8 @@ import p5 from '../core/main';
 /**
  * 
  * test 1
+ * 
+ * test 2
  * Sets the position and orientation of the current camera in a 3D sketch.
  *
  * `camera()` allows objects to be viewed from different angles. It has nine
