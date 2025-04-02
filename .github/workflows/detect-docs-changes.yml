@@ -39,32 +39,36 @@ jobs:
           CHANGES: ${{ env.CHANGES }}
 
       - name: Create Issue in testWebsite
-        if: steps.read-changes.outputs.changes != '[]'
         uses: actions/github-script@v7
+        env:
+          CHANGES: ${{ env.CHANGES }}
         with:
           github-token: ${{ secrets.WEBSITE_REPO_TOKEN }}
           script: |
-            const changes = JSON.parse(`${{ steps.read-changes.outputs.changes }}`);
-            const issueBody = changes.map(change => 
-              `- **File**: \`${change.file}\`\n  - **Line**: ${change.line}\n  - **Old**: ${change.old}\n  - **New**: ${change.new}`
-            ).join("\n\n");
+            const changes = JSON.parse(process.env.CHANGES || '[]'); // ✅ Prevents parsing errors
+            if (changes.length === 0) {
+              console.log("No changes detected. Skipping issue creation.");
+              return;
+            }
             
-            changes.forEach((change, index) => {
-              issueBody += `### Change ${index + 1}\n`;
-              issueBody += `📄 **File:** ${change.file}\n`;
-              issueBody += `🔢 **Line Number:** ${change.line}\n`;
-              issueBody += `📝 **Old:** ${change.old || "N/A"}\n`;
-              issueBody += `🆕 **New:** ${change.new || "N/A"}\n\n`;
+            let issueBody = changes.map(change => 
+              `- **File**: \`${change.file}\`\n  - **Line**: ${change.line}\n  - **Old**: ${change.old || "N/A"}\n  - **New**: ${change.new || "N/A"}`
+            ).join("\n\n");
+
+            issueBody += "\n\n📌 **Translation needed in:**\n";
+            const languages = ["en", "es", "fr", "de"];
+            changes.forEach(change => {
+              languages.forEach(lang => {
+                issueBody += `- [ ] \`reference/${lang}/${change.file.replace(/^src\//, '')}.mdx\`\n`;
+              });
             });
 
-            issueBody += "📌 **Translation needed in:**\n";
-            const languages = ["en", "es", "fr", "de"];
-            languages.forEach(lang => {
-              issueBody += `- [ ] \`reference/${lang}/${folderPath}/${path.basename(change.file)}.mdx\`\n`;
-            });
             await github.rest.issues.create({
               owner: "webermayank",
               repo: "testWebsite",
-              title: ` ${Change.file} updated in P5.js – Translation Needed`,
-              body: `The following documentation updates require translation:\n\n${issueBody}\n\n[View Merged PR](https://github.com/webermayank/TestMain/commit/${{ github.sha }})`
+              title: `${changes[0].file} updated in P5.js – Translation Needed`,
+              body: `The following documentation updates require translation:\n\n${issueBody}\n\n[View Merged PR](https://github.com/webermayank/TestMain/commit/${process.env.GITHUB_SHA})`
             });
+
+            console.log("Issue created successfully.");
+            console.log("Issue Body:", issueBody);
