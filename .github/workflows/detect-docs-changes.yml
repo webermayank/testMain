@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'src/**' # Detect changes in all files inside src/
+      - 'src/**'  # Detect changes in all files inside src/
 
 jobs:
   detect-and-create-issue:
@@ -24,7 +24,9 @@ jobs:
       - name: Read changes JSON
         id: detect-changes
         run: |
-          cat docs_changes.json  # Debugging step to verify JSON content
+          # Print file contents for debugging
+          echo "Contents of docs_changes.json:"
+          cat docs_changes.json
           if [ -s docs_changes.json ]; then
             echo "Changes detected!"
             CHANGES_JSON=$(jq -c . docs_changes.json)
@@ -49,16 +51,13 @@ jobs:
           script: |
             console.log("CHANGES from env:", process.env.CHANGES);
             const changes = JSON.parse(process.env.CHANGES || '[]');
-
             if (changes.length === 0) {
               console.log("No changes detected. Skipping issue creation.");
               return;
             }
-
             let issueBody = changes.map(change => 
               `- **File**: \`${change.file}\`\n  - **Line**: ${change.line}\n  - **Old**: ${change.old || "N/A"}\n  - **New**: ${change.new || "N/A"}`
             ).join("\n\n");
-
             issueBody += "\n\n📌 **Translation needed in:**\n";
             const languages = ["en", "es", "fr", "de"];
             changes.forEach(change => {
@@ -66,13 +65,11 @@ jobs:
                 issueBody += `- [ ] \`reference/${lang}/${change.file.replace(/^src\//, '')}.mdx\`\n`;
               });
             });
-
             await github.rest.issues.create({
               owner: "webermayank",
               repo: "testWebsite",
               title: `${changes[0].file} updated in P5.js – Translation Needed`,
               body: `The following documentation updates require translation:\n\n${issueBody}\n\n[View Merged PR](https://github.com/webermayank/TestMain/commit/${process.env.GITHUB_SHA})`
             });
-
             console.log("Issue created successfully.");
             console.log("Issue Body:", issueBody);

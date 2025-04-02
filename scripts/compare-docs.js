@@ -65,11 +65,12 @@ function compareJSDoc() {
 // Store changes in a JSON file
 function saveChanges() {
   const changes = compareJSDoc();
+  // Always write the file, even if empty
+  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(changes, null, 2));
   if (changes.length > 0) {
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(changes, null, 2));
     console.log("JSDoc changes saved to", OUTPUT_FILE);
   } else {
-    console.log("No JSDoc changes detected.");
+    console.log("No JSDoc changes detected. Empty file written.");
   }
 }
 
