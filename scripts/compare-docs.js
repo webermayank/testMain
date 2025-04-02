@@ -1,16 +1,34 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const { diff } = require("deep-diff");
+const { diffLines } = require("diff"); // You'll need to install this package: npm install diff
 
 const SRC_DIR = "src/";
 const OUTPUT_FILE = "docs_changes.json";
 
-// Function to extract JSDoc comments from a file
-function extractJSDoc(content) {
-  const regex = /\/\*\*[\s\S]*?\*\//g; // Match /** JSDoc comments */
-  const matches = content.match(regex);
-  return matches ? matches.join("\n\n") : "";
+// Function to extract JSDoc comments from a file with line numbers
+function extractJSDocWithLines(content, filePath) {
+  const lines = content.split("\n");
+  const jsdocComments = [];
+  let inJSDoc = false;
+  let startLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith("/**") && !inJSDoc) {
+      inJSDoc = true;
+      startLine = i + 1; // 1-based line number
+    } else if (line.endsWith("*/") && inJSDoc) {
+      inJSDoc = false;
+      jsdocComments.push({
+        text: lines.slice(startLine - 1, i + 1).join("\n"),
+        startLine: startLine,
+        endLine: i + 1,
+      });
+    }
+  }
+
+  return jsdocComments;
 }
 
 // Get changed files between the last and previous commit
@@ -27,13 +45,10 @@ function getChangedFiles() {
   }
 }
 
-// Compare JSDoc content in changed files
+// Compare JSDoc content in changed files and get line numbers
 function compareJSDoc() {
   const changedFiles = getChangedFiles();
   const changes = [];
-
-  // Debugging: Log changed files
-  console.log("Changed files:", changedFiles);
 
   changedFiles.forEach((file) => {
     console.log(`Processing file: ${file}`);
@@ -43,39 +58,59 @@ function compareJSDoc() {
       const oldContent = execSync(`git show HEAD~1:${file}`).toString();
       const newContent = fs.readFileSync(fullPath, "utf-8");
 
-      console.log(`Old JSDoc for ${file}:\n`, extractJSDoc(oldContent));
-      console.log(`New JSDoc for ${file}:\n`, extractJSDoc(newContent));
+      const oldDocs = extractJSDocWithLines(oldContent, file);
+      const newDocs = extractJSDocWithLines(newContent, file);
 
-      const oldDocs = extractJSDoc(oldContent);
-      const newDocs = extractJSDoc(newContent);
+      // Compare each JSDoc block
+      oldDocs.forEach((oldDoc, index) => {
+        if (newDocs[index]) {
+          const diffResult = diffLines(oldDoc.text, newDocs[index].text);
 
-      const docDiff = diff(oldDocs, newDocs);
-
-      if (docDiff) {
-        console.log(`Differences detected in ${file}:`, docDiff);
-        docDiff.forEach((change) => {
-          changes.push({
-            file,
-            line: change.path ? change.path.join(".") : "N/A",
-            old: change.lhs || "",
-            new: change.rhs || "",
+          diffResult.forEach((part) => {
+            if (part.added || part.removed) {
+              changes.push({
+                file: file,
+                line: oldDoc.startLine, // Use the starting line of the JSDoc block
+                old: part.removed ? part.value.trim() : "N/A",
+                new: part.added ? part.value.trim() : "N/A",
+              });
+            }
           });
-        });
-      } else {
-        console.log(`No differences detected in ${file}`);
-      }
+        } else {
+          // JSDoc was removed
+          changes.push({
+            file: file,
+            line: oldDoc.startLine,
+            old: oldDoc.text.trim(),
+            new: "N/A",
+          });
+        }
+      });
+
+      // Check for new JSDoc blocks
+      newDocs.forEach((newDoc, index) => {
+        if (!oldDocs[index]) {
+          changes.push({
+            file: file,
+            line: newDoc.startLine,
+            old: "N/A",
+            new: newDoc.text.trim(),
+          });
+        }
+      });
+
     } catch (error) {
       console.error(`Error processing ${file}:`, error);
     }
   });
 
+  console.log("Detected changes:", changes);
   return changes;
 }
 
 // Store changes in a JSON file
 function saveChanges() {
   const changes = compareJSDoc();
-  // Always write the file, even if empty
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(changes, null, 2));
   if (changes.length > 0) {
     console.log("JSDoc changes saved to", OUTPUT_FILE);
