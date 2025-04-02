@@ -21,6 +21,11 @@ jobs:
       - name: Extract and Compare JSDoc
         run: node ./scripts/compare-docs.js
 
+      - name: Debug docs_changes.json
+        run: |
+          echo "Contents of docs_changes.json:"
+          cat docs_changes.json
+
       - name: Read changes JSON
         id: detect-changes
         run: |

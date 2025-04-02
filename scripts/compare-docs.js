@@ -32,12 +32,19 @@ function compareJSDoc() {
   const changedFiles = getChangedFiles();
   const changes = [];
 
+  // Debugging: Log changed files
+  console.log("Changed files:", changedFiles);
+
   changedFiles.forEach((file) => {
+    console.log(`Processing file: ${file}`);
     const fullPath = path.join(__dirname, "..", file);
 
     try {
       const oldContent = execSync(`git show HEAD~1:${file}`).toString();
       const newContent = fs.readFileSync(fullPath, "utf-8");
+
+      console.log(`Old JSDoc for ${file}:\n`, extractJSDoc(oldContent));
+      console.log(`New JSDoc for ${file}:\n`, extractJSDoc(newContent));
 
       const oldDocs = extractJSDoc(oldContent);
       const newDocs = extractJSDoc(newContent);
@@ -45,6 +52,7 @@ function compareJSDoc() {
       const docDiff = diff(oldDocs, newDocs);
 
       if (docDiff) {
+        console.log(`Differences detected in ${file}:`, docDiff);
         docDiff.forEach((change) => {
           changes.push({
             file,
@@ -53,6 +61,8 @@ function compareJSDoc() {
             new: change.rhs || "",
           });
         });
+      } else {
+        console.log(`No differences detected in ${file}`);
       }
     } catch (error) {
       console.error(`Error processing ${file}:`, error);
